@@ -24,7 +24,7 @@ describe("basic account tests", () => {
 
     it("should generate a valid signature", async () => {
       const privateKey = "0xefbc7a4bb0bf24624f97409473027b62f7ff76e3d232f167e002e1f5872cc2884dcff097bf9912b71d619fc78100de8cf7f55dfddbc2bf5f9fdc36bd670781ee";
-      const expectedEncodedTransaction = "0xf89e01a0a050486fc4a5c236a9072961a5b7394885443cd53a704b2630d495d2fc6c268b880de0b6b3a7640000808204008252088800000002540be40001b8604dcff097bf9912b71d619fc78100de8cf7f55dfddbc2bf5f9fdc36bd670781ee9eaa6d20e765da7a74c7379543b749b2a7e94c9e0f3bcc074c7e644a75a57f96e82ee7a38694fd09118e14c99e45c0acec2f7a359a8151a75a94af1aea713c0b";
+      const expectedEncodedTransaction = "0xf8a001a0a050486fc4a5c236a9072961a5b7394885443cd53a704b2630d495d2fc6c268b880de0b6b3a764000080845b8457118252088800000002540be40001b8604dcff097bf9912b71d619fc78100de8cf7f55dfddbc2bf5f9fdc36bd670781ee84be4c9fdfa713e23c6b1b7f74e77f2a65037b82088611ae496c40ffc182fce2683787da136b19872cc7d9ac95a1c3400e2345202a7b09ec67c876587818010b";
 
       const accs = new Accounts();
       const acc = accs.privateKeyToAccount(privateKey);
@@ -35,7 +35,8 @@ describe("basic account tests", () => {
         gasPrice: 10000000000,
         gas: 21000,
         value: new BN("1000000000000000000"),
-        nonce: 1
+        nonce: 1,
+        timestamp: 1535399697
       };
 
       // we should get the same results using callback and promise API
