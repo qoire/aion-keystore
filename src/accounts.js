@@ -35,15 +35,21 @@ const cryp = accountsCrypto.node;
 
 const {
     toBuffer,
+    removeLeadingZeroX,
     bufferToZeroXHex,
     inputCallFormatter,
-    numberToHex
+    numberToHex,
+    isHexStrict
 } = require('./accounts-format');
+
+const {
+    createKeyPair,
+    createA0Address,
+    aionPubSigLen
+} = require('./accounts-util');
 
 const rlp = require('aion-rlp');
 const AionLong = rlp.AionLong;
-
-const aionPubSigLen = aionLib.accounts.aionPubSigLen;
 
 const isNot = function(value) {
     return (_.isUndefined(value) || _.isNull(value));
@@ -52,6 +58,37 @@ const isNot = function(value) {
 const Accounts = function Accounts() {
     var _this = this;
     this.wallet = new Wallet(this);
+};
+
+const toAionLong = (val) => {
+    let num;
+    if (
+        val === undefined ||
+        val === null ||
+        val === '' ||
+        val === '0x'
+    ) {
+      return null;
+    }
+
+    if (typeof val === 'string') {
+        if (
+            val.indexOf('0x') === 0 ||
+            val.indexOf('0') === 0 ||
+            isHex(val) === true ||
+            isHexStrict(val) === true
+        ) {
+            num = new BN(removeLeadingZeroX(val), 16);
+        } else {
+            num = new BN(val, 10);
+        }
+    }
+
+    if (typeof val === 'number') {
+      num = new BN(val);
+    }
+
+    return new AionLong(num);
 };
 
 Accounts.prototype._addAccountFunctions = function (account) {
@@ -75,11 +112,11 @@ Accounts.prototype._addAccountFunctions = function (account) {
 
 // replaces ethlib/lib/account.js#fromPrivate
 const createAionAccount = function (opts) {
-    const account = aionLib.accounts.createKeyPair({
+    const account = createKeyPair({
         privateKey: opts.privateKey,
         entropy: opts.entropy
     });
-    account.address = aionLib.accounts.createA0Address(account.publicKey);
+    account.address = createA0Address(account.publicKey);
     return account;
 };
 
@@ -106,11 +143,11 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
     if (!tx) {
         error = new Error('No transaction object given!');
 
-        callback(error);
+        callback(error, null);
         return Promise.reject(error);
     }
 
-    function signed (tx) {
+    const signed = (tx) => {
 
         if (!tx.gas && !tx.gasLimit) {
             error = new Error('"gas" is missing');
@@ -119,7 +156,8 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
         if (tx.nonce  < 0 ||
             tx.gas  < 0 ||
             tx.gasPrice  < 0 ||
-            tx.chainId  < 0) {
+            tx.chainId  < 0 ||
+            tx.type < 0) {
             error = new Error('Gas, gasPrice, nonce or chainId is lower than 0');
         }
 
@@ -135,8 +173,8 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
             transaction.to = tx.to || '0x';
             transaction.data = tx.data || '0x';
             transaction.value = tx.value || '0x';
-            transaction.value = tx.timestamp || Math.floor(Date.now() / 1000);
-            transaction.chainId = numberToHex(tx.chainId || 1);
+            transaction.timestamp = tx.timestamp || Math.floor(Date.now() / 1000);
+            transaction.type = numberToHex(tx.type || 1);
 
             var rlpEncoded = rlp.encode([
                 transaction.nonce,
@@ -144,9 +182,9 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
                 transaction.value,
                 transaction.data,
                 transaction.timestamp,
-                new AionLong(new BN(transaction.gasPrice)),
-                new AionLong(new BN(transaction.gas)),
-                new AionLong(new BN(transaction.chainId))
+                toAionLong(transaction.gas),
+                toAionLong(transaction.gasPrice),
+                transaction.type
             ]);
 
             // hash encoded message
@@ -176,7 +214,7 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
             };
 
         } catch(e) {
-            callback(e);
+            callback(e, null);
             return Promise.reject(e);
         }
 
@@ -185,7 +223,7 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
     }
 
     // Resolve immediately if nonce, chainId and price are provided
-    if (tx.nonce !== undefined && tx.chainId !== undefined && tx.gasPrice !== undefined) {
+    if (tx.nonce !== undefined && tx.gasPrice !== undefined) {
         return Promise.resolve(signed(tx));
     }
 
@@ -238,7 +276,7 @@ Accounts.prototype.sign = function sign(data, privateKey) {
 Accounts.prototype.recover = function recover(message, signature) {
     const sig = signature || (message && message.signature);
     const publicKey = toBuffer(sig).slice(0, nacl.sign.publicKeyLength);
-    return aionLib.accounts.createA0Address(publicKey);
+    return createA0Address(publicKey);
 };
 
 // Taken from https://github.com/ethereumjs/ethereumjs-wallet
@@ -255,8 +293,8 @@ Accounts.prototype.decrypt = function (v3Keystore, password, nonStrict) {
         throw new Error('Not a valid V3 wallet');
     }
 
-    const derivedKey;
-    const kdfparams;
+    let derivedKey;
+    let kdfparams;
     if (json.crypto.kdf === 'scrypt') {
         kdfparams = json.crypto.kdfparams;
 

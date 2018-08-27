@@ -18,7 +18,7 @@ let {
   randomHexBuffer,
   // Buffer,
   toBuffer
-} = require('./formats')
+} = require('./accounts-format')
 
 // address + message signature length
 let aionPubSigLen = nacl.sign.publicKeyLength + nacl.sign.signatureLength

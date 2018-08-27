@@ -1,5 +1,5 @@
 let randomHex = require('randomhex');
-let numberToBn = require('number-to-bn');
+const numberToBN = require('number-to-bn');
 
 let {
   isEmpty,
@@ -11,12 +11,19 @@ let {
 } = require('underscore');
 
 let BN = require('bn.js');
-let values = require('./values');
 let patterns = require('./accounts-pattern');
 
 const { blake2b256Hex } = require('./accounts-crypto');
 
 let copyString = val => '' + val
+
+// static constants, most ported from values
+const values = {
+  zeroX: '0x',
+  hex: {
+    randomHexSize: 32
+  }
+};
 
 /**
  * True if string starts with '0x'
@@ -58,8 +65,10 @@ let bufferToZeroXHex = val => prependZeroX(bufferToHex(val))
  * @param {number} size
  * @return {buffer}
  */
-let randomHexBuffer = (size = values.hex.randomHexSize) =>
-  hexToBuffer(removeLeadingZeroX(randomHex(size)))
+let randomHexBuffer = (size = values.hex.randomHexSize) => {
+  const rhex = removeLeadingZeroX(randomHex(size));
+  return hexToBuffer(rhex);
+}
 
 /**
  * True if a string is hex
@@ -102,7 +111,7 @@ function toBuffer(val, encoding) {
 
   if (isNaN(val) === false || isNumber(val) === true || BN.isBN(val) === true) {
     // to array from BN is an array of bytes
-    return Buffer.from(numberToBn(val).toArray())
+    return Buffer.from(numberToBN(val).toArray())
   }
 
   // string
@@ -146,7 +155,7 @@ function toNumber(val) {
  */
 const toBN = (number) => {
     try {
-        return numberToBN.apply(null, arguments);
+        return numberToBN(number);
     } catch(e) {
         throw new Error(e + ' Given value: "'+ number +'"');
     }
@@ -191,7 +200,6 @@ const numberToHex = (value) => {
  * Note: removed support for IBAN
  */
 const inputAddressFormatter = (address) => {
-    const iban = new Iban(address);
     if (patterns.address.test(address)) {
         return '0x' + address.toLowerCase().replace('0x','');
     }
@@ -250,10 +258,9 @@ const _txInputFormatter = (options) => {
 const inputCallFormatter = (options) => {
     options = _txInputFormatter(options);
 
-    if (from) {
+    if (options.from) {
         options.from = inputAddressFormatter(from);
     }
-
 
     return options;
 };
