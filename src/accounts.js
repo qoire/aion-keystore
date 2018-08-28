@@ -246,7 +246,7 @@ Accounts.prototype.hashMessage = function hashMessage(data) {
     var preamble = "\Aion Signed Message:\n" + message.length;
     var preambleBuffer = Buffer.from(preamble);
     var ethMessage = Buffer.concat([preambleBuffer, messageBuffer]);
-    return "0x" + blake2b256(ethMessage).toString(16);
+    return "0x" + blake2b256(ethMessage).toString('hex');
 };
 
 Accounts.prototype.sign = function sign(data, privateKey) {
@@ -308,7 +308,7 @@ Accounts.prototype.decrypt = function (v3Keystore, password, nonStrict) {
 
     const ciphertext = new Buffer(json.crypto.ciphertext, 'hex');
 
-    let mac = blake2b256(Buffer.concat([ derivedKey.slice(16, 32), ciphertext ])).replace('0x','');
+    let mac = blake2b256(Buffer.concat([ derivedKey.slice(16, 32), ciphertext ])).toString('hex');
     if (mac !== json.crypto.mac) {
         throw new Error('Key derivation failed - possibly wrong password');
     }
@@ -367,7 +367,7 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
                 [derivedKey.slice(16, 32),
                 new Buffer(ciphertext, 'hex')]
             )
-        ).toString(16);
+        ).toString('hex');
 
     return {
         version: 3,

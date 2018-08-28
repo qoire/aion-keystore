@@ -2,6 +2,7 @@
 const assert = require('chai').assert;
 const Accounts = require('../src/accounts');
 const BN = require('bn.js');
+const { removeLeadingZeroX } = require('../src/accounts-format');
 
 describe("basic account tests", () => {
   describe("account private/public key tests", () => {
@@ -42,6 +43,24 @@ describe("basic account tests", () => {
       // we should get the same results using callback and promise API
       const res = await acc.signTransaction(transaction);
       assert.equal(res.rawTransaction, expectedEncodedTransaction);
+    });
+  });
+
+  describe("should properly import and export from keystore files", () => {
+    it("should correctly import ksv3 keystore files", () => {
+      const keystores = require('./ksv3_test_vector.json');
+      const accs = new Accounts();
+
+      const rmzx = removeLeadingZeroX;
+
+      // no need to run the whole thing
+      for (let i = 0; i < 1; i++) {
+        const k = keystores[i];
+        const acc = accs.decryptFromRlp(new Buffer.from(k.ksv3, 'hex'), k.password);
+        assert.equal(rmzx(acc.address), k.address);
+        assert.equal(rmzx(acc.privateKey.toString('hex')), k.privateKey);
+        assert.equal(rmzx(acc.publicKey.toString('hex')), k.publicKey);
+      }
     });
   });
 });
