@@ -1,2 +1,2 @@
 const accounts = require('./accounts');
-module.export = accounts;
+module.exports = accounts;

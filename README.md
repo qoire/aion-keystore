@@ -1,4 +1,4 @@
-# web3-eth-accounts
+# aion-keystore
 
 This package is derived from a unreleased version of ``aion-web3 1.0``. The features here were tested to be functioning correctly. Subsequently, this package is expected to be ``deprecated`` when ``aion-web3 1.0`` releases. At which point it will be come unsupported, and users should migrate.
 
@@ -6,8 +6,8 @@ The functionality that this package provides are:
 
 * Signing transactions (client side)
 * Deriving Account information (``publicKey``, ``address``)
-* Import ``Aion`` keystore files
-* Export ``Aion`` keystore files
+* Import ``Aion`` keystore from RLP encoded ``Buffer``s
+* Export ``Aion`` keystore to RLP encoded ``Buffer``s
 
 ## Installation
 
@@ -33,6 +33,3 @@ account.create();
   encrypt: function(password){...}
 }
 ```
-
-[docs]: http://web3js.readthedocs.io/en/1.0/
-[repo]: https://github.com/ethereum/web3.js

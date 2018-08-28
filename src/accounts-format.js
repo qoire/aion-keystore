@@ -1,3 +1,10 @@
+/**
+ * accounts-format.js, common patterns for accounts
+ *
+ * This is ported over from a currently unreleased version of aion-web3 1.0. For more information see:
+ * https://github.com/aionnetwork/aion_web3/issues/10
+ */
+
 let randomHex = require('randomhex');
 const numberToBN = require('number-to-bn');
 

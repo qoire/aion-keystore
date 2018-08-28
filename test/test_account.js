@@ -1,6 +1,6 @@
 /// Basic Account Functionality Tests
 const assert = require('chai').assert;
-const Accounts = require('../src/accounts');
+const Accounts = require('../src/index');
 const BN = require('bn.js');
 const { removeLeadingZeroX } = require('../src/accounts-format');
 
@@ -61,7 +61,7 @@ describe("basic account tests", () => {
         assert.equal(rmzx(acc.privateKey.toString('hex')), k.privateKey);
         assert.equal(rmzx(acc.publicKey.toString('hex')), k.publicKey);
       }
-    });
+    }).timeout(5000);
 
     it("should parse import from ksv3, reserialize and get same encoding", () => {
       const accs = new Accounts();
@@ -86,6 +86,6 @@ describe("basic account tests", () => {
         const encoded = a.encryptToRlp(a.test_password, { salt: a.test_salt, iv: a.test_iv, uuid: a.test_uuid });
         assert.equal(encoded.toString('hex'), a.test_ksv3);
       }
-    });
+    }).timeout(5000);
   });
 });

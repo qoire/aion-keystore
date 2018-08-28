@@ -35,6 +35,7 @@ const cryp = accountsCrypto.node;
 
 const {
     toBuffer,
+    prependZeroX,
     removeLeadingZeroX,
     bufferToZeroXHex,
     inputCallFormatter,
@@ -95,22 +96,22 @@ const toAionLong = (val) => {
 };
 
 Accounts.prototype._addAccountFunctions = function (account) {
-    var _this = this;
+    const _this = this;
 
     // add sign functions
     account.signTransaction = function signTransaction(tx, callback) {
-        return _this.signTransaction(tx, account.privateKey, callback);
+        return _this.signTransaction(tx, account._privateKey, callback);
     };
     account.sign = function sign(data) {
-        return _this.sign(data, account.privateKey);
+        return _this.sign(data, account._privateKey);
     };
 
     account.encrypt = function encrypt(password, options) {
-        return _this.encrypt(account.privateKey, password, options);
+        return _this.encrypt(account._privateKey, password, options);
     };
 
     account.encryptToRlp = function encryptToRlp(password, options) {
-        return _this.encryptToRlp(account.privateKey, password, options);
+        return _this.encryptToRlp(account._privateKey, password, options);
     }
 
     return account;
@@ -122,7 +123,9 @@ const createAionAccount = function (opts) {
         privateKey: opts.privateKey,
         entropy: opts.entropy
     });
-    account.address = createA0Address(account.publicKey);
+    account.privateKey = prependZeroX(account._privateKey.toString('hex'));
+    account.publicKey = prependZeroX(account._publicKey.toString('hex'));
+    account.address = createA0Address(account._publicKey);
     return account;
 };
 
@@ -175,14 +178,14 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
         try {
             tx = inputCallFormatter(tx);
 
-            var transaction = tx;
+            const transaction = tx;
             transaction.to = tx.to || '0x';
             transaction.data = tx.data || '0x';
             transaction.value = tx.value || '0x';
             transaction.timestamp = tx.timestamp || Math.floor(Date.now() / 1000);
             transaction.type = numberToHex(tx.type || 1);
 
-            var rlpEncoded = rlp.encode([
+            const rlpEncoded = rlp.encode([
                 transaction.nonce,
                 transaction.to.toLowerCase(),
                 transaction.value,
@@ -194,24 +197,24 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
             ]);
 
             // hash encoded message
-            var hash = blake2b256(rlpEncoded);
+            const hash = blake2b256(rlpEncoded);
 
             // sign with nacl
-            var signature = toBuffer(nacl.sign.detached(hash, account.privateKey));
+            const signature = toBuffer(nacl.sign.detached(hash, account._privateKey));
 
             // verify nacl signature
-            if (nacl.sign.detached.verify(hash, signature, account.publicKey) === false) {
+            if (nacl.sign.detached.verify(hash, signature, account._publicKey) === false) {
                 throw new Error('Could not verify signature.');
             }
 
             // aion-specific signature scheme
-            var aionPubSig = Buffer.concat([account.publicKey, signature], aionPubSigLen);
+            const aionPubSig = Buffer.concat([account._publicKey, signature], aionPubSigLen);
 
             // add the aion pub-sig
-            var rawTx = rlp.decode(rlpEncoded).concat(aionPubSig);
+            const rawTx = rlp.decode(rlpEncoded).concat(aionPubSig);
 
             // re-encode with signature included
-            var rawTransaction = rlp.encode(rawTx);
+            const rawTransaction = rlp.encode(rawTx);
 
             result = {
                 messageHash: bufferToZeroXHex(hash),
@@ -247,28 +250,28 @@ Accounts.prototype.recoverTransaction = function recoverTransaction(rawTx) {
 Accounts.prototype.hashMessage = function hashMessage(data) {
     throw new Error("functionality currently not supported");
 
-    var message = isHexStrict(data) ? Buffer.from(data.substring(2), 'hex') : data;
-    var messageBuffer = Buffer.from(message);
-    var preamble = "\Aion Signed Message:\n" + message.length;
-    var preambleBuffer = Buffer.from(preamble);
-    var ethMessage = Buffer.concat([preambleBuffer, messageBuffer]);
+    const message = isHexStrict(data) ? Buffer.from(data.substring(2), 'hex') : data;
+    const messageBuffer = Buffer.from(message);
+    const preamble = "\Aion Signed Message:\n" + message.length;
+    const preambleBuffer = Buffer.from(preamble);
+    const ethMessage = Buffer.concat([preambleBuffer, messageBuffer]);
     return "0x" + blake2b256(ethMessage).toString('hex');
 };
 
 Accounts.prototype.sign = function sign(data, privateKey) {
     throw new Error("functionality currently not supported");
 
-    var account = this.privateKeyToAccount(privateKey);
-    var publicKey = account.publicKey;
-    var hash = this.hashMessage(data);
-    var signature = toBuffer(
+    const account = this.privateKeyToAccount(privateKey);
+    const publicKey = account._publicKey;
+    const hash = this.hashMessage(data);
+    const signature = toBuffer(
         nacl.sign.detached(
             toBuffer(hash),
             toBuffer(privateKey)
         )
     );
     // address + message signature
-    var aionPubSig = Buffer.concat(
+    const aionPubSig = Buffer.concat(
         [toBuffer(publicKey), toBuffer(signature)],
         aionPubSigLen
     );
@@ -326,7 +329,7 @@ Accounts.prototype.decrypt = function (v3Keystore, password, nonStrict) {
 
 Accounts.prototype.encrypt = function (privateKey, password, options, fast = true) {
     /* jshint maxcomplexity: 20 */
-    var account = this.privateKeyToAccount(privateKey);
+    const account = this.privateKeyToAccount(privateKey);
 
     options = options || {};
     const salt = options.salt || cryp.randomBytes(32);
@@ -366,7 +369,7 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
         throw new Error('Unsupported cipher');
     }
 
-    const ciphertext = Buffer.concat([ cipher.update(account.privateKey), cipher.final() ]);
+    const ciphertext = Buffer.concat([ cipher.update(account._privateKey), cipher.final() ]);
 
     const mac = blake2b256(
             Buffer.concat(
@@ -513,8 +516,8 @@ Wallet.prototype._findSafeIndex = function (pointer) {
 };
 
 Wallet.prototype._currentIndexes = function () {
-    var keys = Object.keys(this);
-    var indexes = keys
+    const keys = Object.keys(this);
+    const indexes = keys
         .map(function(key) { return parseInt(key); })
         .filter(function(n) { return (n < 9e20); });
 
@@ -522,7 +525,7 @@ Wallet.prototype._currentIndexes = function () {
 };
 
 Wallet.prototype.create = function (numberOfAccounts, entropy) {
-    for (var i = 0; i < numberOfAccounts; ++i) {
+    for (let i = 0; i < numberOfAccounts; ++i) {
         this.add(this._accounts.create(entropy).privateKey);
     }
     return this;
@@ -550,7 +553,7 @@ Wallet.prototype.add = function (account) {
 };
 
 Wallet.prototype.remove = function (addressOrIndex) {
-    var account = this[addressOrIndex];
+    const account = this[addressOrIndex];
 
     if (account && account.address) {
         // address
@@ -572,8 +575,8 @@ Wallet.prototype.remove = function (addressOrIndex) {
 };
 
 Wallet.prototype.clear = function () {
-    var _this = this;
-    var indexes = this._currentIndexes();
+    const _this = this;
+    const indexes = this._currentIndexes();
 
     indexes.forEach(function(index) {
         _this.remove(index);
@@ -583,10 +586,10 @@ Wallet.prototype.clear = function () {
 };
 
 Wallet.prototype.encrypt = function (password, options) {
-    var _this = this;
-    var indexes = this._currentIndexes();
+    const _this = this;
+    const indexes = this._currentIndexes();
 
-    var accounts = indexes.map(function(index) {
+    const accounts = indexes.map(function(index) {
         return _this[index].encrypt(password, options);
     });
 
@@ -595,10 +598,10 @@ Wallet.prototype.encrypt = function (password, options) {
 
 
 Wallet.prototype.decrypt = function (encryptedWallet, password) {
-    var _this = this;
+    const _this = this;
 
     encryptedWallet.forEach(function (keystore) {
-        var account = _this._accounts.decrypt(keystore, password);
+        const account = _this._accounts.decrypt(keystore, password);
 
         if (account) {
             _this.add(account);
@@ -617,7 +620,7 @@ Wallet.prototype.save = function (password, keyName) {
 };
 
 Wallet.prototype.load = function (password, keyName) {
-    var keystore = localStorage.getItem(keyName || this.defaultKeyName);
+    let keystore = localStorage.getItem(keyName || this.defaultKeyName);
 
     if (keystore) {
         try {

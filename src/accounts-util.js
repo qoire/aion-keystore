@@ -30,8 +30,8 @@ function createKeyPair({entropy, privateKey}) {
   if (privateKey !== undefined) {
     kp = nacl.sign.keyPair.fromSecretKey(toBuffer(privateKey))
     keyPair = {
-      privateKey: toBuffer(kp.secretKey),
-      publicKey: toBuffer(kp.publicKey)
+      _privateKey: toBuffer(kp.secretKey),
+      _publicKey: toBuffer(kp.publicKey)
     }
     return keyPair
   }
@@ -50,8 +50,8 @@ function createKeyPair({entropy, privateKey}) {
 
   kp = nacl.sign.keyPair.fromSeed(entropy.slice(0, nacl.sign.seedLength))
   keyPair = {
-    privateKey: toBuffer(kp.secretKey),
-    publicKey: toBuffer(kp.publicKey)
+    _privateKey: toBuffer(kp.secretKey),
+    _publicKey: toBuffer(kp.publicKey)
   }
   return keyPair
 }
