@@ -11,6 +11,7 @@ describe("basic account tests", () => {
       const acc = accs.create();
       assert.isNotNull(acc.publicKey);
       assert.isNotNull(acc.address);
+      console.log(acc);
     });
 
     it("should generate an account", () => {
@@ -42,6 +43,7 @@ describe("basic account tests", () => {
 
       // we should get the same results using callback and promise API
       const res = await acc.signTransaction(transaction);
+      console.log(res);
       assert.equal(res.rawTransaction, expectedEncodedTransaction);
     });
   });
