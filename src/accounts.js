@@ -301,13 +301,7 @@ Accounts.prototype.decrypt = function (v3Keystore, password, nonStrict) {
         // FIXME: support progress reporting callback
         derivedKey = scryptsy(new Buffer(password), new Buffer(kdfparams.salt, 'hex'), kdfparams.n, kdfparams.r, kdfparams.p, kdfparams.dklen);
     } else if (json.crypto.kdf === 'pbkdf2') {
-        kdfparams = json.crypto.kdfparams;
-
-        if (kdfparams.prf !== 'hmac-sha256') {
-            throw new Error('Unsupported parameters to PBKDF2');
-        }
-
-        derivedKey = cryp.pbkdf2Sync(new Buffer(password), new Buffer(kdfparams.salt, 'hex'), kdfparams.c, kdfparams.dklen, 'sha256');
+        throw new Error('pbkdf2 is unsupported by AION keystore format');
     } else {
         throw new Error('Unsupported key derivation scheme');
     }
@@ -324,13 +318,19 @@ Accounts.prototype.decrypt = function (v3Keystore, password, nonStrict) {
     return this.privateKeyToAccount(seed);
 };
 
-Accounts.prototype.encrypt = function (privateKey, password, options) {
+Accounts.prototype.encrypt = function (privateKey, password, options, fast = true) {
     /* jshint maxcomplexity: 20 */
     var account = this.privateKeyToAccount(privateKey);
 
     options = options || {};
     const salt = options.salt || cryp.randomBytes(32);
     const iv = options.iv || cryp.randomBytes(16);
+
+    // removed support for pbkdf2, we don't support it on the kernel side
+    // doesn't make sense to allow this if we want kernel compatibility
+    if ((options.kdf !== null || options.kdf !== undefined) && options.kdf === 'pbkdf2') {
+        throw new Error("pbkdf2 format unsupported, use scrypt");
+    }
 
     let derivedKey;
     const kdf = options.kdf || 'scrypt';
@@ -345,7 +345,9 @@ Accounts.prototype.encrypt = function (privateKey, password, options) {
         derivedKey = cryp.pbkdf2Sync(new Buffer(password), salt, kdfparams.c, kdfparams.dklen, 'sha256');
     } else if (kdf === 'scrypt') {
         // FIXME: support progress reporting callback
-        kdfparams.n = options.n || 8192; // 2048 4096 8192 16384
+        // support fast identifier, enabled by default, but gives the user the option
+        // to switch to iterations identical to kernel side (but this will be CPU intensive)
+        kdfparams.n = options.n || fast ? 8192 : 262144; // 2048 4096 8192 16384
         kdfparams.r = options.r || 8;
         kdfparams.p = options.p || 1;
         derivedKey = scryptsy(new Buffer(password), salt, kdfparams.n, kdfparams.r, kdfparams.p, kdfparams.dklen);
@@ -383,6 +385,94 @@ Accounts.prototype.encrypt = function (privateKey, password, options) {
         }
     };
 };
+
+Accounts.prototype.encryptToRlp = function(privateKey, password, options) {
+    return toRlp(this.encrypt(privateKey, password, options));
+}
+
+
+Accounts.prototype.decryptFromRlp = function(buffer, password) {
+    return this.decrypt(fromRlp(buffer), password);
+}
+
+/**
+ * Serializes ksv3 object into buffer
+ * https://github.com/aionnetwork/aion/blob/tx_encoding_tests/modMcf/src/org/aion/mcf/account/KeystoreItem.java
+ *
+ * @method toRlp
+ * @param {object} ksv3 (struct)
+ * @return {buffer} Keystore (serialized)
+ */
+const toRlp = (ksv3) => {
+    const _kdfparams = [];
+    _kdfparams[0] = "";
+    _kdfparams[1] = ksv3.crypto.kdfparams.dklen;
+    _kdfparams[2] = ksv3.crypto.kdfparams.n;
+    _kdfparams[3] = ksv3.crypto.kdfparams.p;
+    _kdfparams[4] = ksv3.crypto.kdfparams.r;
+    _kdfparams[5] = ksv3.crypto.kdfparams.salt.toString('hex');
+    const kdfparams = rlp.encode(_kdfparams);
+
+    const _cipherparams = [];
+    _cipherparams[0] = ksv3.crypto.cipherparams.iv.toString('hex');
+    let Cipherparams = rlp.encode(_cipherparams);
+
+    const _crypto = [];
+    _crypto[0] = 'aes-128-ctr';
+    _crypto[1] = ksv3.crypto.ciphertext.toString('hex');
+    _crypto[2] = "scrypt";
+    _crypto[3] = ksv3.crypto.mac;
+    _crypto[4] = Cipherparams;
+    _crypto[5] = Kdfparams;
+    const crypto = rlp.encode(_crypto);
+
+    const _keystore = [];
+    _keystore[0] = ksv3.id;
+    _keystore[1] = 3;
+    _keystore[2] = ksv3.address;
+    _keystore[3] = Crypto;
+    const keystore = rlp.encode(_keystore);
+    return keystore;
+}
+
+/**
+ * Deserializes keystore into ksv3 object
+ * https://github.com/aionnetwork/aion/blob/tx_encoding_tests/modMcf/src/org/aion/mcf/account/KeystoreItem.java
+ *
+ * @method fromRlp
+ * @param {object} Keystore (serialized)
+ * @return {buffer} ksv3 (struct)
+ */
+const fromRlp = (keystore) => {
+
+    // Store return ksv3 object
+    const Ksv3 = rlp.decode(Buffer.from(keystore, 'hex'));
+    const Crypto = rlp.decode(Ksv3[3]);
+    const Cipherparams = rlp.decode(Crypto[4]);
+    const Kdfparams = rlp.decode(Crypto[5]);
+
+    return {
+        id: Ksv3[0].toString('utf8'),
+        version: parseInt(Ksv3[1].toString('hex'), 16),
+        address: Ksv3[2].toString('utf8'),
+        crypto: {
+            cipher: Crypto[0].toString('utf8'),
+            ciphertext: Crypto[1].toString('utf8'),
+            kdf: Crypto[2].toString('utf8'),
+            mac: Crypto[3].toString('utf8'),
+            cipherparams: {
+                iv: Cipherparams[0].toString('utf8')
+            },
+            kdfparams: {
+                dklen: parseInt(Kdfparams[1].toString('hex'), 16),
+                n: parseInt(Kdfparams[2].toString('hex'), 16),
+                p: parseInt(Kdfparams[3].toString('hex'), 16),
+                r: parseInt(Kdfparams[4].toString('hex'), 16),
+                salt: Kdfparams[5].toString('utf8')
+            }
+        }
+    };
+}
 
 
 // Note: this is trying to follow closely the specs on
