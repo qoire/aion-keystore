@@ -47,10 +47,10 @@ describe("basic account tests", () => {
   });
 
   describe("should properly import and export from keystore files", () => {
-    it("should correctly import ksv3 keystore files", () => {
-      const keystores = require('./ksv3_test_vector.json');
-      const accs = new Accounts();
+    const keystores = require('./ksv3_test_vector.json');
 
+    it("should correctly import ksv3 keystore files", () => {
+      const accs = new Accounts();
       const rmzx = removeLeadingZeroX;
 
       // no need to run the whole thing
@@ -60,6 +60,31 @@ describe("basic account tests", () => {
         assert.equal(rmzx(acc.address), k.address);
         assert.equal(rmzx(acc.privateKey.toString('hex')), k.privateKey);
         assert.equal(rmzx(acc.publicKey.toString('hex')), k.publicKey);
+      }
+    });
+
+    it("should parse import from ksv3, reserialize and get same encoding", () => {
+      const accs = new Accounts();
+
+      // no need to run the whole thing
+      const accounts = [];
+      for (let i = 0; i < 1; i++) {
+        const k = keystores[i];
+        const acc = accs.decryptFromRlp(new Buffer.from(k.ksv3, 'hex'), k.password);
+
+        // tag on test fields for later use
+        acc.test_password = k.password;
+        acc.test_ksv3 = k.ksv3;
+        acc.test_salt = Buffer.from(k.salt, 'hex');
+        acc.test_iv = Buffer.from(k.iv, 'hex');
+        acc.test_uuid = k.uuid;
+        accounts.push(acc);
+      }
+
+      for (let i = 0; i < accounts.length; i++) {
+        const a = accounts[i];
+        const encoded = a.encryptToRlp(a.test_password, { salt: a.test_salt, iv: a.test_iv, uuid: a.test_uuid });
+        assert.equal(encoded.toString('hex'), a.test_ksv3);
       }
     });
   });

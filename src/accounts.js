@@ -39,6 +39,7 @@ const {
     bufferToZeroXHex,
     inputCallFormatter,
     numberToHex,
+    isHex,
     isHexStrict
 } = require('./accounts-format');
 
@@ -47,6 +48,8 @@ const {
     createA0Address,
     aionPubSigLen
 } = require('./accounts-util');
+
+const uuidV4Pattern = require('./accounts-pattern').uuid;
 
 const rlp = require('aion-rlp');
 const AionLong = rlp.AionLong;
@@ -106,6 +109,9 @@ Accounts.prototype._addAccountFunctions = function (account) {
         return _this.encrypt(account.privateKey, password, options);
     };
 
+    account.encryptToRlp = function encryptToRlp(password, options) {
+        return _this.encryptToRlp(account.privateKey, password, options);
+    }
 
     return account;
 };
@@ -350,7 +356,7 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
         kdfparams.n = options.n || fast ? 8192 : 262144; // 2048 4096 8192 16384
         kdfparams.r = options.r || 8;
         kdfparams.p = options.p || 1;
-        derivedKey = scryptsy(new Buffer(password), salt, kdfparams.n, kdfparams.r, kdfparams.p, kdfparams.dklen);
+        derivedKey = scryptsy(Buffer.from(password, 'utf-8'), salt, kdfparams.n, kdfparams.r, kdfparams.p, kdfparams.dklen);
     } else {
         throw new Error('Unsupported kdf');
     }
@@ -360,7 +366,7 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
         throw new Error('Unsupported cipher');
     }
 
-    const ciphertext = Buffer.concat([ cipher.update(new Buffer(account.privateKey.replace('0x',''), 'hex')), cipher.final() ]);
+    const ciphertext = Buffer.concat([ cipher.update(account.privateKey), cipher.final() ]);
 
     const mac = blake2b256(
             Buffer.concat(
@@ -369,9 +375,22 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
             )
         ).toString('hex');
 
+    // add a special clause to uuid, if we detect that uuid field is present
+    // and not a hexadecimal number, treat it as the pre-calculated UUID
+    let _uuid = null;
+    if (typeof options.uuid === "string" && uuidV4Pattern.test(options.uuid)) {
+        _uuid = options.uuid;
+    } else {
+        let randomIn = options.uuid;
+        if (typeof randomIn === "string" && isHex(options.uuid)) {
+            randomIn = Buffer.from(options.uuid, 'hex');
+        }
+        _uuid = uuid.v4({ random: randomIn || cryp.randomBytes(16) });
+    }
+
     return {
         version: 3,
-        id: uuid.v4({ random: options.uuid || cryp.randomBytes(16) }),
+        id: _uuid,
         address: account.address.toLowerCase().replace('0x',''),
         crypto: {
             ciphertext: ciphertext.toString('hex'),
@@ -415,22 +434,22 @@ const toRlp = (ksv3) => {
 
     const _cipherparams = [];
     _cipherparams[0] = ksv3.crypto.cipherparams.iv.toString('hex');
-    let Cipherparams = rlp.encode(_cipherparams);
+    const cipherparams = rlp.encode(_cipherparams);
 
     const _crypto = [];
     _crypto[0] = 'aes-128-ctr';
     _crypto[1] = ksv3.crypto.ciphertext.toString('hex');
-    _crypto[2] = "scrypt";
+    _crypto[2] = 'scrypt';
     _crypto[3] = ksv3.crypto.mac;
-    _crypto[4] = Cipherparams;
-    _crypto[5] = Kdfparams;
+    _crypto[4] = cipherparams;
+    _crypto[5] = kdfparams;
     const crypto = rlp.encode(_crypto);
 
     const _keystore = [];
     _keystore[0] = ksv3.id;
     _keystore[1] = 3;
     _keystore[2] = ksv3.address;
-    _keystore[3] = Crypto;
+    _keystore[3] = crypto;
     const keystore = rlp.encode(_keystore);
     return keystore;
 }

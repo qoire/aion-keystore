@@ -38,7 +38,9 @@ const patterns = Object.freeze({
   // similar to typeNArray but just captures array length
   arraySizeDigit: /(?:\[)(\d+)/,
   // used to check against IBAN addresses ../iban.js
-  validIban: /^XE[0-9]{2}(AIO[0-9A-Z]{13}|[0-9A-Z]{30,31})$/
+  validIban: /^XE[0-9]{2}(AIO[0-9A-Z]{13}|[0-9A-Z]{30,31})$/,
+  // used to check uuidv4
+  uuid: /^[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/i
 })
 
 module.exports = patterns
