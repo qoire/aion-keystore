@@ -11,7 +11,6 @@ describe("basic account tests", () => {
       const acc = accs.create();
       assert.isNotNull(acc.publicKey);
       assert.isNotNull(acc.address);
-      console.log(acc);
     });
 
     it("should generate an account", () => {
@@ -43,7 +42,6 @@ describe("basic account tests", () => {
 
       // we should get the same results using callback and promise API
       const res = await acc.signTransaction(transaction);
-      console.log(res);
       assert.equal(res.rawTransaction, expectedEncodedTransaction);
     });
   });
@@ -58,7 +56,7 @@ describe("basic account tests", () => {
       // no need to run the whole thing
       for (let i = 0; i < 1; i++) {
         const k = keystores[i];
-        const acc = accs.decryptFromRlp(new Buffer.from(k.ksv3, 'hex'), k.password);
+        const acc = accs.decryptFromRlp(Buffer.from(k.ksv3, 'hex'), k.password);
         assert.equal(rmzx(acc.address), k.address);
         assert.equal(rmzx(acc.privateKey.toString('hex')), k.privateKey);
         assert.equal(rmzx(acc.publicKey.toString('hex')), k.publicKey);
@@ -72,7 +70,7 @@ describe("basic account tests", () => {
       const accounts = [];
       for (let i = 0; i < 1; i++) {
         const k = keystores[i];
-        const acc = accs.decryptFromRlp(new Buffer.from(k.ksv3, 'hex'), k.password);
+        const acc = accs.decryptFromRlp(Buffer.from(k.ksv3, 'hex'), k.password);
 
         // tag on test fields for later use
         acc.test_password = k.password;
@@ -89,5 +87,42 @@ describe("basic account tests", () => {
         assert.equal(encoded.toString('hex'), a.test_ksv3);
       }
     }).timeout(5000);
+  });
+
+  describe("should properly sign arbitrary messages in different fashions", () => {
+    it("should sign a message in a fashion that can be recovered", () => {
+      const accs = new Accounts();
+      const acc = accs.create();
+
+      const inputMsg = "hello world!";
+      const out = acc.sign(inputMsg);
+
+      const outputAddress = acc.recover(inputMsg, out.signature);
+      assert.equal(outputAddress, acc.address);
+    });
+
+    it("should fail when signature is incorrect", () => {
+      const accs = new Accounts();
+      const acc = accs.create();
+
+      const inputMsg = "good day sir!";
+
+      const wrongInputMsg = "good day to you too!";
+      const wrongSignature = acc.sign(wrongInputMsg);
+
+      let caughtError = false;
+      try {
+        const outputAddress = acc.recover(inputMsg, wrongSignature);
+      } catch (e) {
+        // do nothing, this is expected case
+        caughtError = true;
+      }
+
+      assert.equal(caughtError, true);
+    });
+
+    it("should properly recover a signed transaction (with correct user initials)", () => {
+
+    });
   });
 });

@@ -6,6 +6,7 @@
  */
 
 const blake2b = require('blake2b');
+const k256 = require('js-sha3').keccak256;
 const nacl = require('tweetnacl');
 const scrypt = require('scryptsy');
 const node = require('crypto');
@@ -15,6 +16,10 @@ const blake2b256 = (val) => {
     const out = Buffer.alloc(blake2b.BYTES);
     blake2b(blake2b.BYTES).update(val).digest(out);
     return out;
+};
+
+const keccak256 = (val) => {
+    return k256(val);
 };
 
 /**
@@ -39,5 +44,6 @@ module.exports = {
     blake2b256Hex,
     nacl,
     scrypt,
-    node
+    node,
+    keccak256
 };

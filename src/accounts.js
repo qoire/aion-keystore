@@ -29,6 +29,7 @@ const BN = require('bn.js');
 
 const accountsCrypto = require('./accounts-crypto');
 const blake2b256 = accountsCrypto.blake2b256;
+const keccak256 = accountsCrypto.keccak256;
 const nacl = accountsCrypto.nacl;
 const scryptsy = accountsCrypto.scrypt;
 const cryp = accountsCrypto.node;
@@ -102,9 +103,12 @@ Accounts.prototype._addAccountFunctions = function (account) {
     account.signTransaction = function signTransaction(tx, callback) {
         return _this.signTransaction(tx, account._privateKey, callback);
     };
+
     account.sign = function sign(data) {
         return _this.sign(data, account._privateKey);
     };
+
+    account.recover = (message, data) => _this.recover(message, data);
 
     account.encrypt = function encrypt(password, options) {
         return _this.encrypt(account._privateKey, password, options);
@@ -112,7 +116,7 @@ Accounts.prototype._addAccountFunctions = function (account) {
 
     account.encryptToRlp = function encryptToRlp(password, options) {
         return _this.encryptToRlp(account._privateKey, password, options);
-    }
+    };
 
     return account;
 };
@@ -229,7 +233,7 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
 
         callback(null, result);
         return result;
-    }
+    };
 
     // Resolve immediately if nonce, chainId and price are provided
     if (tx.nonce !== undefined && tx.gasPrice !== undefined) {
@@ -241,35 +245,49 @@ Accounts.prototype.signTransaction = function signTransaction(tx, privateKey, ca
 };
 
 /* jshint ignore:start */
+// TODO
 Accounts.prototype.recoverTransaction = function recoverTransaction(rawTx) {
-    return this.recover(null, rlp.decode(rawTx).pop());
+    throw new Error("unsupported operation");
 };
 /* jshint ignore:end */
 
-
-Accounts.prototype.hashMessage = function hashMessage(data) {
-    throw new Error("functionality currently not supported");
-
+/**
+ * Hashing methodology compatible with existing Aion implementation in eth_sign.
+ *
+ * @param data
+ * @returns {string}
+ */
+const hashMessageAion = function hashMessage(data) {
     const message = isHexStrict(data) ? Buffer.from(data.substring(2), 'hex') : data;
     const messageBuffer = Buffer.from(message);
-    const preamble = "\Aion Signed Message:\n" + message.length;
+    const preamble = "\x19Aion Signed Message:\n" + message.length;
     const preambleBuffer = Buffer.from(preamble);
     const ethMessage = Buffer.concat([preambleBuffer, messageBuffer]);
-    return "0x" + blake2b256(ethMessage).toString('hex');
+    return "0x" + keccak256(ethMessage).toString('hex');
 };
 
+/**
+ * Signs an arbitrary data payload, when providing the message note that special
+ * treatment is given to strict (0x) prefixed hex strings. These will be
+ * automatically converted to Buffers before being input. Otherwise input
+ * strings will be treated as UTF-8.
+ *
+ * @param {string || buffer} data payload to be signed
+ * @param {buffer} privateKey
+ * @returns {{message: *, messageHash: *, signature: (string|*)}}
+ */
 Accounts.prototype.sign = function sign(data, privateKey) {
-    throw new Error("functionality currently not supported");
 
     const account = this.privateKeyToAccount(privateKey);
     const publicKey = account._publicKey;
-    const hash = this.hashMessage(data);
+    const hash = hashMessageAion(data);
     const signature = toBuffer(
         nacl.sign.detached(
             toBuffer(hash),
             toBuffer(privateKey)
         )
     );
+
     // address + message signature
     const aionPubSig = Buffer.concat(
         [toBuffer(publicKey), toBuffer(signature)],
@@ -282,9 +300,34 @@ Accounts.prototype.sign = function sign(data, privateKey) {
     };
 };
 
-Accounts.prototype.recover = function recover(message, signature) {
+/**
+ * Recovers the address from an encoded payload, note that this is not the same as
+ * simply recovering a signature. The method in which the message is
+ * encoded is treated as defined in the sign method as well as the eth_sign
+ * API call.
+ *
+ * @param message
+ * @param signature
+ * @param {boolean} hasPreamble
+ * @returns {*}
+ */
+Accounts.prototype.recover = function recover(message, signature, hasPreamble) {
+    // to keep compatibility with old version
+    if (hasPreamble === undefined)
+        hasPreamble = true;
+
     const sig = signature || (message && message.signature);
     const publicKey = toBuffer(sig).slice(0, nacl.sign.publicKeyLength);
+    const edsig = toBuffer(sig).slice(nacl.sign.publicKeyLength, sig.length);
+
+    const messageHash = hasPreamble ? hashMessageAion(message) : blake2b256(message);
+
+    // debate whether we throw or return null here
+    // rationale is that this is closer to what eth-lib would do
+    if (!nacl.sign.detached.verify(toBuffer(messageHash), edsig, publicKey)) {
+        throw new Error("invalid signature, cannot recover public key");
+    }
+
     return createA0Address(publicKey);
 };
 
@@ -410,12 +453,12 @@ Accounts.prototype.encrypt = function (privateKey, password, options, fast = tru
 
 Accounts.prototype.encryptToRlp = function(privateKey, password, options) {
     return toRlp(this.encrypt(privateKey, password, options));
-}
+};
 
 
 Accounts.prototype.decryptFromRlp = function(buffer, password) {
     return this.decrypt(fromRlp(buffer), password);
-}
+};
 
 /**
  * Serializes ksv3 object into buffer
@@ -462,7 +505,7 @@ const toRlp = (ksv3) => {
  * https://github.com/aionnetwork/aion/blob/tx_encoding_tests/modMcf/src/org/aion/mcf/account/KeystoreItem.java
  *
  * @method fromRlp
- * @param {object} Keystore (serialized)
+ * @param {object} keystore (serialized)
  * @return {buffer} ksv3 (struct)
  */
 const fromRlp = (keystore) => {
@@ -494,7 +537,7 @@ const fromRlp = (keystore) => {
             }
         }
     };
-}
+};
 
 
 // Note: this is trying to follow closely the specs on
