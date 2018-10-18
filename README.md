@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/qoire/aion-keystore.svg?branch=master)](https://travis-ci.org/qoire/aion-keystore) [![Coverage Status](https://coveralls.io/repos/github/qoire/aion-keystore/badge.svg?branch=travis)](https://coveralls.io/github/qoire/aion-keystore?branch=travis) 
 
-This package is derived from a unreleased version of ``aion-web3 1.0``. The features here were tested to be functioning correctly. Subsequently, this package is expected to be ``deprecated`` when ``aion-web3 1.0`` releases. At which point it will be come unsupported, and users should migrate.
+This package is derived from a unreleased version of ``aion-web3 1.0``. The features here were tested to be functioning correctly. Currently, ``aion-web3 1.0`` does not inherit all properties of this package. Therefore this package will continue to be maintained.
 
 The functionality that this package provides are:
 
