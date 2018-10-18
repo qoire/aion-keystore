@@ -13,13 +13,13 @@ const node = require('crypto');
 
 
 const blake2b256 = (val) => {
-    const out = Buffer.alloc(blake2b.BYTES);
-    blake2b(blake2b.BYTES).update(val).digest(out);
-    return out;
+  const out = Buffer.alloc(blake2b.BYTES);
+  blake2b(blake2b.BYTES).update(val).digest(out);
+  return out;
 };
 
 const keccak256 = (val) => {
-    return k256(val);
+  return k256(val);
 };
 
 /**
@@ -32,18 +32,18 @@ const keccak256 = (val) => {
  * @return {String} the blake2b256 string prepended with '0x'
  */
 const blake2b256Hex = (value) => {
-    if (isHexStrict(value) && /^0x/i.test((value).toString())) {
-        value = Buffer.from(value.substr(2), 'hex');
-    }
-    const out = blake2b256(value);
-    return aionLib.formats.prependZeroX(out.toString('hex'));
+  if (isHexStrict(value) && /^0x/i.test((value).toString())) {
+    value = Buffer.from(value.substr(2), 'hex');
+  }
+  const out = blake2b256(value);
+  return aionLib.formats.prependZeroX(out.toString('hex'));
 };
 
 module.exports = {
-    blake2b256,
-    blake2b256Hex,
-    nacl,
-    scrypt,
-    node,
-    keccak256
+  blake2b256,
+  blake2b256Hex,
+  nacl,
+  scrypt,
+  node,
+  keccak256
 };

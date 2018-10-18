@@ -161,11 +161,11 @@ function toNumber(val) {
  * @return {BN} BN
  */
 const toBN = (number) => {
-    try {
-        return numberToBN(number);
-    } catch(e) {
-        throw new Error(e + ' Given value: "'+ number +'"');
-    }
+  try {
+    return numberToBN(number);
+  } catch(e) {
+    throw new Error(e + ' Given value: "'+ number +'"');
+  }
 };
 
 /**
@@ -176,7 +176,7 @@ const toBN = (number) => {
  * @returns {Boolean}
  */
 const isHexStrict = (hex) => {
-    return ((isString(hex) || isNumber(hex)) && /^(-)?0x[0-9a-f]*$/i.test(hex));
+  return ((isString(hex) || isNumber(hex)) && /^(-)?0x[0-9a-f]*$/i.test(hex));
 };
 
 /**
@@ -187,18 +187,18 @@ const isHexStrict = (hex) => {
  * @return {String}
  */
 const numberToHex = (value) => {
-    if (isNull(value) || isUndefined(value)) {
-        return value;
-    }
+  if (isNull(value) || isUndefined(value)) {
+    return value;
+  }
 
-    if (!isFinite(value) && !isHexStrict(value)) {
-        throw new Error('Given input "'+value+'" is not a number.');
-    }
+  if (!isFinite(value) && !isHexStrict(value)) {
+    throw new Error('Given input "'+value+'" is not a number.');
+  }
 
-    const number = toBN(value);
-    const result = number.toString(16);
+  const number = toBN(value);
+  const result = number.toString(16);
 
-    return number.lt(new BN(0)) ? '-0x' + result.substr(1) : '0x' + result;
+  return number.lt(new BN(0)) ? '-0x' + result.substr(1) : '0x' + result;
 };
 
 /// Following is ported from web3-core-helpers in aion-web3 1.0
@@ -207,10 +207,10 @@ const numberToHex = (value) => {
  * Note: removed support for IBAN
  */
 const inputAddressFormatter = (address) => {
-    if (patterns.address.test(address)) {
-        return '0x' + address.toLowerCase().replace('0x','');
-    }
-    throw new Error('Provided address "'+ address +'" is invalid');
+  if (patterns.address.test(address)) {
+    return '0x' + address.toLowerCase().replace('0x','');
+  }
+  throw new Error('Provided address "'+ address +'" is invalid');
 };
 
 /**
@@ -222,54 +222,54 @@ const inputAddressFormatter = (address) => {
  */
 const _txInputFormatter = (options) => {
 
-    if (options.to) { // it might be contract creation
-        options.to = inputAddressFormatter(options.to);
-    }
+  if (options.to) { // it might be contract creation
+    options.to = inputAddressFormatter(options.to);
+  }
 
-    if (options.data && options.input) {
-        throw new Error('You can\'t have "data" and "input" as properties of transactions at the same time, please use either "data" or "input" instead.');
-    }
+  if (options.data && options.input) {
+    throw new Error('You can\'t have "data" and "input" as properties of transactions at the same time, please use either "data" or "input" instead.');
+  }
 
-    if (!options.data && options.input) {
-        options.data = options.input;
-        delete options.input;
-    }
+  if (!options.data && options.input) {
+    options.data = options.input;
+    delete options.input;
+  }
 
-    if(options.data && !isHex(options.data)) {
-        throw new Error('The data field must be HEX encoded data.');
-    }
+  if(options.data && !isHex(options.data)) {
+    throw new Error('The data field must be HEX encoded data.');
+  }
 
-    // allow both
-    if (options.gas || options.gasLimit) {
-        options.gas = options.gas || options.gasLimit;
-    }
+  // allow both
+  if (options.gas || options.gasLimit) {
+    options.gas = options.gas || options.gasLimit;
+  }
 
-    ['gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
-        return options[key] !== undefined;
-    }).forEach(function(key){
-        options[key] = numberToHex(options[key]);
-    });
+  ['gasPrice', 'gas', 'value', 'nonce'].filter(function (key) {
+    return options[key] !== undefined;
+  }).forEach(function(key){
+    options[key] = numberToHex(options[key]);
+  });
 
-    return options;
+  return options;
 };
 
 /**
  * Formats the input of a transaction and converts all values to HEX
- * 
+ *
  * Note: modified to REMOVE from, in this context we don't need it
- * 
+ *
  * @method inputCallFormatter
  * @param {Object} transaction options
  * @returns object
-*/
+ */
 const inputCallFormatter = (options) => {
-    options = _txInputFormatter(options);
+  options = _txInputFormatter(options);
 
-    if (options.from) {
-        options.from = inputAddressFormatter(from);
-    }
+  if (options.from) {
+    options.from = inputAddressFormatter(from);
+  }
 
-    return options;
+  return options;
 };
 
 module.exports = {
