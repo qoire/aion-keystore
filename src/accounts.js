@@ -110,6 +110,10 @@ Accounts.prototype._addAccountFunctions = function (account) {
 
     account.recover = (message, data) => _this.recover(message, data);
 
+    account.signMessage = (message) => _this.signMessage(message, account._privateKey);
+
+    account.recoverMessage = (message, signature) => _this.recoverMessage(message, signature, account._privateKey);
+
     account.encrypt = function encrypt(password, options) {
         return _this.encrypt(account._privateKey, password, options);
     };
@@ -277,7 +281,6 @@ const hashMessageAion = function hashMessage(data) {
  * @returns {{message: *, messageHash: *, signature: (string|*)}}
  */
 Accounts.prototype.sign = function sign(data, privateKey) {
-
     const account = this.privateKeyToAccount(privateKey);
     const publicKey = account._publicKey;
     const hash = hashMessageAion(data);
@@ -311,16 +314,12 @@ Accounts.prototype.sign = function sign(data, privateKey) {
  * @param {boolean} hasPreamble
  * @returns {*}
  */
-Accounts.prototype.recover = function recover(message, signature, hasPreamble) {
-    // to keep compatibility with old version
-    if (hasPreamble === undefined)
-        hasPreamble = true;
-
+Accounts.prototype.recover = function recover(message, signature) {
     const sig = signature || (message && message.signature);
     const publicKey = toBuffer(sig).slice(0, nacl.sign.publicKeyLength);
     const edsig = toBuffer(sig).slice(nacl.sign.publicKeyLength, sig.length);
 
-    const messageHash = hasPreamble ? hashMessageAion(message) : blake2b256(message);
+    const messageHash = hashMessageAion(message);
 
     // debate whether we throw or return null here
     // rationale is that this is closer to what eth-lib would do
@@ -329,6 +328,66 @@ Accounts.prototype.recover = function recover(message, signature, hasPreamble) {
     }
 
     return createA0Address(publicKey);
+};
+
+/**
+ * Alternative implementation that does not support a pre-amble also
+ * does not maintain backwards compatibility with existing AION kernel.
+ *
+ * Hashing algorithm is also changed to blake2b to be more consistent
+ * with expected behaviour from user.
+ *
+ * @param data
+ * @param privateKey
+ * @returns {{message: *, messageHash: string, signature: (string|*)}}
+ */
+Accounts.prototype.signMessage = function signMessage(data, privateKey) {
+    const account = this.privateKeyToAccount(privateKey);
+    const publicKey = account._publicKey;
+    const hash = blake2b256(data);
+
+    const signature = toBuffer(
+    nacl.sign.detached(
+      toBuffer(hash),
+      toBuffer(privateKey)
+    )
+  );
+
+  // address + message signature
+  const aionPubSig = Buffer.concat(
+    [toBuffer(publicKey), toBuffer(signature)],
+    aionPubSigLen
+  );
+  return {
+    message: data,
+    messageHash: hash,
+    signature: bufferToZeroXHex(aionPubSig)
+  };
+};
+
+/**
+ * Alternative implementation that does not support pre-amble also
+ * does not maintain backwards compatibility with AION kernel.
+ *
+ *
+ * @param message
+ * @param signature
+ * @returns {*}
+ */
+Accounts.prototype.recoverMessage = function recoverMessage(message, signature) {
+  const sig = signature || (message && message.signature);
+  const publicKey = toBuffer(sig).slice(0, nacl.sign.publicKeyLength);
+  const edsig = toBuffer(sig).slice(nacl.sign.publicKeyLength, sig.length);
+
+  const messageHash = blake2b256(message);
+
+  // debate whether we throw or return null here
+  // rationale is that this is closer to what eth-lib would do
+  if (!nacl.sign.detached.verify(toBuffer(messageHash), edsig, publicKey)) {
+    throw new Error("invalid signature, cannot recover public key");
+  }
+
+  return createA0Address(publicKey);
 };
 
 // Taken from https://github.com/ethereumjs/ethereumjs-wallet

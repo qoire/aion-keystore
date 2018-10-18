@@ -90,7 +90,7 @@ describe("basic account tests", () => {
   });
 
   describe("should properly sign arbitrary messages in different fashions", () => {
-    it("should sign a message in a fashion that can be recovered", () => {
+    it("should sign a message in a fashion that can be recovered (AION compliant)", () => {
       const accs = new Accounts();
       const acc = accs.create();
 
@@ -101,7 +101,7 @@ describe("basic account tests", () => {
       assert.equal(outputAddress, acc.address);
     });
 
-    it("should fail when signature is incorrect", () => {
+    it("should fail when signature is incorrect (AION compliant)", () => {
       const accs = new Accounts();
       const acc = accs.create();
 
@@ -121,8 +121,35 @@ describe("basic account tests", () => {
       assert.equal(caughtError, true);
     });
 
-    it("should properly recover a signed transaction (with correct user initials)", () => {
+    it("should sign a message in a fashion that can be recovered", () => {
+      const accs = new Accounts();
+      const acc = accs.create();
 
+      const inputMsg = "hello world!";
+      const out = acc.signMessage(inputMsg);
+
+      const outputAddress = acc.recoverMessage(inputMsg, out.signature);
+      assert.equal(outputAddress, acc.address);
+    });
+
+    it("should fail when signature is incorrect", () => {
+      const accs = new Accounts();
+      const acc = accs.create();
+
+      const inputMsg = "good day sir!";
+
+      const wrongInputMsg = "good day to you too!";
+      const wrongSignature = acc.signMessage(wrongInputMsg);
+
+      let caughtError = false;
+      try {
+        const outputAddress = acc.recoverMessage(inputMsg, wrongSignature);
+      } catch (e) {
+        // do nothing, this is expected case
+        caughtError = true;
+      }
+
+      assert.equal(caughtError, true);
     });
   });
 });
